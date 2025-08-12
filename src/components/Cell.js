@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { Form, Button, Row, Col } from "react-bootstrap";
+// colabcms/src/components/Cell.js
+import React, { useState, useRef } from "react";
+import { Form, Button, Row, Col, Spinner } from "react-bootstrap";
 import models from "../data/models.json";
 import prompts from "../data/prompts.json";
 
@@ -8,10 +9,37 @@ export default function Cell({ isNew, isAlternate }) {
   const [output, setOutput] = useState("");
   const [model, setModel] = useState(models[0]);
   const [prompt, setPrompt] = useState(prompts[0]);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const runAI = () => {
-    setOutput(`Model: ${model}\nPrompt: ${prompt}\nContext: ${context}`);
+  const outputRef = useRef(null);
+
+  const runAI = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model, prompt, context }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setOutput(data.output);
+    } catch (err) {
+      setOutput(`Error: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
+
+    const copyOutput = () => {
+        if (outputRef.current) {
+        navigator.clipboard.writeText(outputRef.current.value).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 8000);
+        });
+        }
+    };
 
   return (
     <div
@@ -22,7 +50,7 @@ export default function Cell({ isNew, isAlternate }) {
         backgroundColor: isNew
           ? "#fff9db"
           : isAlternate
-          ? "#f36506ff"  // light gray for alternate cells
+          ? "#f36506ff"
           : "white",
         transition: "background-color 0.5s ease",
       }}
@@ -37,13 +65,26 @@ export default function Cell({ isNew, isAlternate }) {
         />
       </Form.Group>
 
-      <Form.Group className="mb-3">
+      {/* Output with Copy button */}
+      <Form.Group className="mb-3 position-relative">
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          onClick={copyOutput}
+          className="position-absolute"
+          style={{ top: 4, right: 4, zIndex: 2 }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </Button>
+
         <Form.Control
+          ref={outputRef}
           as="textarea"
           rows={3}
-          placeholder="Output will appear here..."
-          value={output}
+          placeholder={loading ? "⏳ Generating…" : "Output will appear here…"}
+          value={loading ? "" : output}
           readOnly
+          disabled={loading}
         />
       </Form.Group>
 
@@ -67,8 +108,22 @@ export default function Cell({ isNew, isAlternate }) {
           </Form.Select>
         </Col>
         <Col xs="auto">
-          <Button variant="danger" onClick={runAI}>
-            Run
+          <Button variant="danger" onClick={runAI} disabled={loading}>
+            {loading ? (
+              <>
+                <Spinner
+                  as="span"
+                  animation="border"
+                  size="sm"
+                  role="status"
+                  aria-hidden="true"
+                  className="me-1"
+                />
+                Loading…
+              </>
+            ) : (
+              "Run"
+            )}
           </Button>
         </Col>
       </Row>

@@ -1,3 +1,5 @@
+// colabcms/src/App.js
+
 import React, { useState } from "react";
 import Container from "react-bootstrap/Container";
 import TabManager from "./components/TabManager";
